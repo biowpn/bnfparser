@@ -21,6 +21,8 @@ def translate(rules, nt_map):
         for a in sub:
             if type(a) is int:
                 a = get_nt_name(a)
+            else:
+                a = repr(a)
             sub_named.append(a)
         translated.append((nt_named, sub_named))
     return translated

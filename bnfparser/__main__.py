@@ -3,24 +3,19 @@ import argparse
 import json
 import sys
 
-from . import bnfparser
+from . import lexer
+from . import parser
 
 
 def translate(rules, nt_map):
 
-    def get_nt_name(nt):
-        if nt in nt_map:
-            return '<' + nt_map[nt] + '>'
-        else:
-            return '<(temp-{})>'.format(nt)
-
     translated = []
     for nt, sub in rules:
-        nt_named = get_nt_name(nt)
+        nt_named = f"<{nt_map[nt]}>"
         sub_named = []
         for a in sub:
             if type(a) is int:
-                a = get_nt_name(a)
+                a = f"<{nt_map[a]}>"
             else:
                 a = repr(a)
             sub_named.append(a)
@@ -29,28 +24,30 @@ def translate(rules, nt_map):
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("file", type=argparse.FileType('r'),
-                        help="BNF syntax file")
-    parser.add_argument("-l", "--long", action="store_true",
-                        help="preserve long terminals")
-    parser.add_argument("-v", "--verify", action="store_true",
-                        help="only verify whether the syntax is correct instead of printing out each rule")
-    parser.add_argument("-t", "--translate", action="store_true",
-                        help="translate non-terminals (represented by an integer) to their origin names")
-    parser.add_argument("-f", "--format", choices=["bnf", "json"], default="bnf",
-                        help="output format")
-    parser.add_argument("-o", "--out", type=argparse.FileType('w'), default=sys.stdout,
-                        help="output file")
-    args = parser.parse_args()
+    ap = argparse.ArgumentParser()
+    ap.add_argument("file", type=argparse.FileType('r'),
+                    help="BNF syntax file")
+    ap.add_argument("-l", "--long", action="store_true",
+                    help="preserve long terminals")
+    ap.add_argument("-v", "--verify", action="store_true",
+                    help="only verify whether the syntax is correct instead of printing out each rule")
+    ap.add_argument("-t", "--translate", action="store_true",
+                    help="translate non-terminals (represented by an integer) to their origin names")
+    ap.add_argument("-f", "--format", choices=["raw", "bnf", "json"], default="raw",
+                    help="output format")
+    ap.add_argument("-o", "--out", type=argparse.FileType('w'), default=sys.stdout,
+                    help="output file")
+    args = ap.parse_args()
+
+    bp = parser.BNFParser()
 
     buf = args.file.read()
 
     try:
-        rules, nt_map = bnfparser.parse(buf, args.long)
-    except bnfparser.ParsingException as e:
-        print("syntax error:")
-        print(str(e))
+        lexemes = lexer.lex(buf, args.long)
+        rules = bp.parse(lexemes)
+    except parser.ParsingException as e:
+        print(f"syntax error: {e}")
         return
 
     if args.verify:
@@ -58,10 +55,12 @@ def main():
         return
 
     if args.translate:
-        reverse_nt_map = {v: k for k, v in nt_map.items()}
-        rules = translate(rules, reverse_nt_map)
+        rules = translate(rules, bp.get_nt_map())
 
-    if args.format == "bnf":
+    if args.format == "raw":
+        for rule in rules:
+            print(rule, file=args.out)
+    elif args.format == "bnf":
         for nt, sub in rules:
             print(nt, "::=", *sub, file=args.out)
     elif args.format == "json":

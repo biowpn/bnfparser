@@ -33,7 +33,7 @@ def main():
                     help="only verify whether the syntax is correct instead of printing out each rule")
     ap.add_argument("-t", "--translate", action="store_true",
                     help="translate non-terminals (represented by an integer) to their origin names")
-    ap.add_argument("-f", "--format", choices=["raw", "bnf", "json"], default="raw",
+    ap.add_argument("-f", "--format", choices=["raw", "bnf", "json", "ssi"], default="raw",
                     help="output format")
     ap.add_argument("-o", "--out", type=argparse.FileType('w'), default=sys.stdout,
                     help="output file")
@@ -65,6 +65,17 @@ def main():
             print(nt, "::=", *sub, file=args.out)
     elif args.format == "json":
         json.dump(rules, args.out, indent=4)
+    elif args.format == "ssi":
+        for nt, sub in rules:
+            ints = []
+            for a in sub:
+                if type(a) is int:
+                    ints.append(-a)
+                elif a == "":
+                    ints.append(0)
+                else:
+                    ints.append(ord(a))
+            print(-nt, *ints, file=args.out)
 
 
 if __name__ == "__main__":

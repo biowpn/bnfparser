@@ -34,7 +34,7 @@ class BNFParser:
             self.nt_count += 1
             if name is None:
                 name = f"temp-{self.nt_count}"
-            self.nt_map[name] = self.nt_count
+            self.nt_map[name] = -self.nt_count
         return self.nt_map[name]
 
     def _eval(self, op: int):

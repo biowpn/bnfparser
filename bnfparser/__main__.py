@@ -70,12 +70,12 @@ def main():
             ints = []
             for a in sub:
                 if type(a) is int:
-                    ints.append(-a)
+                    ints.append(a)
                 elif a == "":
                     ints.append(0)
                 else:
                     ints.append(ord(a))
-            print(-nt, *ints, file=args.out)
+            print(nt, *ints, file=args.out)
 
 
 if __name__ == "__main__":

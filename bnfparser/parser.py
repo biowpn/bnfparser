@@ -153,8 +153,9 @@ class BNFParser:
             while self.opstack:
                 self._eval(self.opstack.pop())
 
-            self.rules.insert(0, (nt_idx, self.vstack.pop()))
+            self.rules.append((nt_idx, self.vstack.pop()))
 
+        self.rules.sort(key=lambda x: x[0], reverse=True)
         return self.rules
 
     def get_nt_map(self):

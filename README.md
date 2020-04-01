@@ -29,7 +29,7 @@ Each symbol in the subsitution can be either a non-terminal or a terminal (a lit
 
 The starting non-terminal is always -1.
 
-If `long` is True, then the parser will preserve long terminals instead of breaking them down into single characters (some simple lexing is performed).
+If `long` is True, then the parser will preserve long terminals instead of breaking them down into characters.
 
 `nt_map` is a mapping from terminal id (the negative integer) to terminal name. Note that some extra terminals might be generated if regular syntax was used, and they will be named like "temp-%d".
 

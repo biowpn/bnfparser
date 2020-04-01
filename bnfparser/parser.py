@@ -153,7 +153,7 @@ class BNFParser:
             while self.opstack:
                 self._eval(self.opstack.pop())
 
-            self.rules.append((nt_idx, self.vstack.pop()))
+            self.rules.insert(0, (nt_idx, self.vstack.pop()))
 
         return self.rules
 

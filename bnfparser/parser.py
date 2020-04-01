@@ -2,6 +2,12 @@
 from .token import *
 
 
+def parse(lexemes):
+    bp = BNFParser()
+    rules = bp.parse(lexemes)
+    return rules, bp.get_nt_map()
+
+
 class ParsingException(Exception):
 
     def __init__(self, desc, line, col):

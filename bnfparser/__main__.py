@@ -29,10 +29,8 @@ def main():
                     help="BNF syntax file")
     ap.add_argument("-l", "--long", action="store_true",
                     help="preserve long terminals")
-    ap.add_argument("-v", "--verify", action="store_true",
-                    help="only verify whether the syntax is correct instead of printing out each rule")
     ap.add_argument("-t", "--translate", action="store_true",
-                    help="translate non-terminals (represented by an integer) to their origin names")
+                    help="translate non-terminals to their origin names")
     ap.add_argument("-f", "--format", choices=["raw", "bnf", "json", "ssi"], default="raw",
                     help="output format")
     ap.add_argument("-o", "--out", type=argparse.FileType('w'), default=sys.stdout,
@@ -48,10 +46,6 @@ def main():
         rules = bp.parse(lexemes)
     except parser.ParsingException as e:
         print(f"syntax error: {e}")
-        return
-
-    if args.verify:
-        print("syntax correct")
         return
 
     if args.translate:

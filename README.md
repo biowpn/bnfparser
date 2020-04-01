@@ -6,71 +6,33 @@ Simple [BNF](https://en.wikipedia.org/wiki/Backus%E2%80%93Naur_form) grammar par
 ## Usage
 
 ```
-rules, nt_map = bnfparser.parse(src: str, long: bool)
+# Lexing
+words = bnfparser.lexer.lex(src: str, long: bool)
+
+# Parsing
+rules, nt_map = bnfparser.parser.parse(words)
 ```
 
-`rules` is a list of transition rules:
+The result `rules` is a list of production rules:
 
 ```
 [rule1, rule2, ...]
 ```
 
-Each rule is a 2-tuple: a non-terminal represented by an integer, and a list of subsitutionals:
+Each rule is a 2-tuple: a non-terminal identified by a negative integer and a subsitution as a list of symbols:
 
 ```
-(0, ['(', 0, ')'])
+(-1, ['(', -1, ')'])
 ```
 
-Each subsitutional can be either a non-terminal (an integer) or a terminal (a single-character string).
+Each symbol in the subsitution can be either a non-terminal or a terminal (a literal string).
+
+The starting non-terminal is always -1.
 
 If `long` is True, then the parser will preserve long terminals instead of breaking them down into single characters (some simple lexing is performed).
 
-`nt_map` is a mapping from terminal name to terminal id (its integer representation in the parsing output). Note that some extra terminals might be generated if regular syntax was used, therefore **not all terminals have original names**.
+`nt_map` is a mapping from terminal id (the negative integer) to terminal name. Note that some extra terminals might be generated if regular syntax was used, and they will be named like "temp-%d".
 
 ## Command Line Usage
 
-Original BNF ([examples/dna.bnf](./examples/dna.bnf)):
-
-```
-<DNA> ::= <DNA> <Nucleotide> | <Nucleotide>
-
-<Nucleotide> ::= 'A' | 'G' | 'C' | 'T'
-```
-
-Command:
-
-```
-python -m bnfparser .\examples\dna.bnf -t
-```
-
-Output:
-
-```
-<DNA> ::= <DNA> <Nucleotide>
-<DNA> ::= <Nucleotide>
-<Nucleotide> ::= A
-<Nucleotide> ::= G
-<Nucleotide> ::= C
-<Nucleotide> ::= T
-```
-
-Command:
-
-```
-python -m bnfparser .\examples\dna.bnf -t -f json
-```
-
-Output (equivalent to):
-
-```
-[
-    ["<DNA>", ["<DNA>", "<Nucleotide>"]],
-    ["<DNA>", ["<DNA>"]],
-    ["<Nucleotide>", ["A"]],
-    ["<Nucleotide>", ["G"]],
-    ["<Nucleotide>", ["C"]],
-    ["<Nucleotide>", ["T"]]
-]
-```
-
-For all available options, run with `-h`.
+Run `python -m bnfparser -h` to see usage.

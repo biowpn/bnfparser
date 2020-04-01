@@ -41,24 +41,35 @@ class BNFParser:
         """
         Helper for evaluating subsitution of a production rule.
         """
-        res = self._alloc_nt()
-        lhs = self.vstack.pop()
-        if op == OPERATOR_RE_ALTERNATION:
-            rhs = self.vstack.pop()
-            self.rules.append((res, lhs))
+
+        rhs = self.vstack.pop()
+        if op == OPERATOR_RE_CONCATENATION:
+            lhs = self.vstack.pop()
+            lhs.extend(rhs)
+            self.vstack.append(lhs)
+        elif op == OPERATOR_RE_ALTERNATION:
+            res = self._alloc_nt()
+            lhs = self.vstack.pop()
             self.rules.append((res, rhs))
+            self.rules.append((res, lhs))
+            self.vstack.append([res])
         elif op == OPERATOR_RE_ZERO_OR_MORE:
-            self.rules.append((res, lhs + [res]))
+            res = self._alloc_nt()
+            self.rules.append((res, rhs + [res]))
             self.rules.append((res, [""]))
+            self.vstack.append([res])
         elif op == OPERATOR_RE_ONE_OR_MORE:
-            self.rules.append((res, lhs + [res]))
-            self.rules.append((res, lhs))
+            res = self._alloc_nt()
+            self.rules.append((res, rhs + [res]))
+            self.rules.append((res, rhs))
+            self.vstack.append([res])
         elif op == OPERATOR_RE_ZERO_OR_ONE:
-            self.rules.append((res, lhs))
+            res = self._alloc_nt()
+            self.rules.append((res, rhs))
             self.rules.append((res, [""]))
+            self.vstack.append([res])
         else:
             raise Exception(f"unknown operator {op}")
-        self.vstack.append([res])
 
     def parse(self, lexemes):
         """
@@ -92,9 +103,9 @@ class BNFParser:
             is_last_tk_v = False
 
             for tk in sub:
-                is_cur_tk_v = False
                 if tk.name == PRECENDENCE_OVERRIDE_BEGIN:
                     self.opstack.append(PRECENDENCE_OVERRIDE_BEGIN)
+                    is_last_tk_v = False
                 elif tk.name == PRECENDENCE_OVERRIDE_END:
                     last_op = self.opstack.pop()
                     while last_op != PRECENDENCE_OVERRIDE_BEGIN:
@@ -109,27 +120,30 @@ class BNFParser:
                 elif tk.name == OPERATOR_RE_ALTERNATION:
                     while self.opstack:
                         top = self.opstack[-1]
-                        if top == PRECENDENCE_OVERRIDE_BEGIN or top == OPERATOR_RE_ALTERNATION:
+                        if top in (OPERATOR_RE_ZERO_OR_MORE, OPERATOR_RE_ONE_OR_MORE, OPERATOR_RE_ZERO_OR_ONE, OPERATOR_RE_CONCATENATION):
+                            self._eval(top)
+                            self.opstack.pop()
+                        else:
                             break
-                        self._eval(top)
-                        self.opstack.pop()
                     self.opstack.append(tk.name)
-                elif tk.name == NON_TERMINAL:
-                    is_cur_tk_v = True
-                    _i = self._alloc_nt(tk.value)
+                    is_last_tk_v = False
+                elif tk.name == NON_TERMINAL or tk.name == TERMINAL:
+                    v = tk.value
+                    if tk.name == NON_TERMINAL:
+                        v = self._alloc_nt(v)
                     if is_last_tk_v:
-                        self.vstack[-1].append(_i)
-                    else:
-                        self.vstack.append([_i])
-                elif tk.name == TERMINAL:
-                    is_cur_tk_v = True
-                    if is_last_tk_v:
-                        self.vstack[-1].append(tk.value)
-                    else:
-                        self.vstack.append([tk.value])
+                        while self.opstack:
+                            top = self.opstack[-1]
+                            if top in (OPERATOR_RE_ZERO_OR_MORE, OPERATOR_RE_ONE_OR_MORE, OPERATOR_RE_ZERO_OR_ONE):
+                                self._eval(top)
+                                self.opstack.pop()
+                            else:
+                                break
+                        self.opstack.append(OPERATOR_RE_CONCATENATION)
+                    self.vstack.append([v])
+                    is_last_tk_v = True
                 else:
                     raise Exception(f"got unexpected token type {tk.name}")
-                is_last_tk_v = is_cur_tk_v
             while self.opstack:
                 self._eval(self.opstack.pop())
 

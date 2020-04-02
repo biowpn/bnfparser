@@ -90,10 +90,11 @@ def lex(_input, long: False):
         elif c == '?':
             lexemes.append(Token(OPERATOR_RE_ZERO_OR_ONE, c))
 
-        # elif c == '[':
-        #     lexemes.append(Token(ZERO_OR_ONE_BLOCK_BEGIN, c))
-        # elif c == ']':
-        #     lexemes.append(Token(ZERO_OR_ONE_BLOCK_END, c))
+        elif c == '[':
+            lexemes.append(Token(PRECENDENCE_OVERRIDE_BEGIN, c))
+        elif c == ']':
+            lexemes.append(Token(PRECENDENCE_OVERRIDE_END, c))
+            lexemes.append(Token(OPERATOR_RE_ZERO_OR_ONE, c))
 
         elif c == '(':
             lexemes.append(Token(PRECENDENCE_OVERRIDE_BEGIN, c))

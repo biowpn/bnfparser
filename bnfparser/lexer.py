@@ -25,6 +25,7 @@ def lex(_input, long: False):
             else:
                 word += c
             continue
+
         elif sl_char == r'<':
             if c == '>':
                 if word == "":
@@ -35,6 +36,31 @@ def lex(_input, long: False):
             else:
                 word += c
             continue
+
+        elif sl_char == '%':
+            if c in string.digits or c in string.ascii_letters:
+                word += c
+                continue
+            if len(word) == 0:
+                raise Exception(f"no numeric expression after {sl_char}")
+            if word[0] == 'x':
+                base = 16
+                word = word[1:]
+            elif word[0] == 'd':
+                base = 10
+                word = word[1:]
+            elif word[0] == 'b':
+                base = 2
+                word = word[1:]
+            elif word[0] in string.digits:
+                base = 10
+            else:
+                raise Exception(
+                    f"unknown base specifier for numeric expression: {word[0]}")
+            lexemes.append(Token(TERMINAL, chr(int(word, base))))
+            sl_char = ''
+            word = ""
+
         elif sl_char != '':
             raise Exception(f"lexer error: unexpected slc {sl_char}")
 
@@ -42,6 +68,10 @@ def lex(_input, long: False):
             sl_char = c
 
         elif c == '<':
+            word = ""
+            sl_char = c
+
+        elif c == '%':
             word = ""
             sl_char = c
 
@@ -59,6 +89,11 @@ def lex(_input, long: False):
             lexemes.append(Token(OPERATOR_RE_ONE_OR_MORE, c))
         elif c == '?':
             lexemes.append(Token(OPERATOR_RE_ZERO_OR_ONE, c))
+
+        # elif c == '[':
+        #     lexemes.append(Token(ZERO_OR_ONE_BLOCK_BEGIN, c))
+        # elif c == ']':
+        #     lexemes.append(Token(ZERO_OR_ONE_BLOCK_END, c))
 
         elif c == '(':
             lexemes.append(Token(PRECENDENCE_OVERRIDE_BEGIN, c))

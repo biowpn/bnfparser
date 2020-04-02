@@ -8,17 +8,6 @@ def parse(lexemes):
     return rules, bp.get_nt_map()
 
 
-class ParsingException(Exception):
-
-    def __init__(self, desc, line, col):
-        self.desc = desc
-        self.line = line
-        self.col = col
-
-    def __str__(self):
-        return f"line {self.line}, column {self.col}: {self.desc}"
-
-
 class BNFParser:
 
     def __init__(self):
@@ -43,39 +32,47 @@ class BNFParser:
             self.nt_map[name] = -self.nt_count
         return self.nt_map[name]
 
-    def _eval(self, op: int):
+    def _eval(self, op: Token):
         """
         Helper for evaluating subsitution of a production rule.
         """
-
+        if not self.vstack:
+            raise BNFSyntaxError(f"missing operand for operator", op.pos)
         rhs = self.vstack.pop()
-        if op == OPERATOR_RE_CONCATENATION:
+
+        if op.name == OPERATOR_RE_CONCATENATION:
+            if not self.vstack:
+                raise BNFSyntaxError(
+                    f"missing operand for operator", op.pos)
             lhs = self.vstack.pop()
             lhs.extend(rhs)
             self.vstack.append(lhs)
-        elif op == OPERATOR_RE_ALTERNATION:
+        elif op.name == OPERATOR_RE_ALTERNATION:
             res = self._alloc_nt()
+            if not self.vstack:
+                raise BNFSyntaxError(
+                    f"missing operand for operator", op.pos)
             lhs = self.vstack.pop()
             self.rules.append((res, rhs))
             self.rules.append((res, lhs))
             self.vstack.append([res])
-        elif op == OPERATOR_RE_ZERO_OR_MORE:
+        elif op.name == OPERATOR_RE_ZERO_OR_MORE:
             res = self._alloc_nt()
             self.rules.append((res, rhs + [res]))
             self.rules.append((res, [""]))
             self.vstack.append([res])
-        elif op == OPERATOR_RE_ONE_OR_MORE:
+        elif op.name == OPERATOR_RE_ONE_OR_MORE:
             res = self._alloc_nt()
             self.rules.append((res, rhs + [res]))
             self.rules.append((res, rhs))
             self.vstack.append([res])
-        elif op == OPERATOR_RE_ZERO_OR_ONE:
+        elif op.name == OPERATOR_RE_ZERO_OR_ONE:
             res = self._alloc_nt()
             self.rules.append((res, rhs))
             self.rules.append((res, [""]))
             self.vstack.append([res])
         else:
-            raise Exception(f"unknown operator {op}")
+            raise Exception(f"parser error: unexpected operator {op.name}")
 
     def parse(self, lexemes):
         """
@@ -84,12 +81,13 @@ class BNFParser:
 
         while len(lexemes) > 0:
             if len(lexemes) < 3:
-                raise Exception("too few lexemes to form a rule")
+                raise BNFSyntaxError("cannot form a rule", lexemes[-1].pos)
             if lexemes[0].name != NON_TERMINAL:
-                raise Exception("beginning of a rule is not non-terminal")
+                raise BNFSyntaxError(
+                    "beginning of a rule is not non-terminal", lexemes[0].pos)
             if lexemes[1].name != OPREATOR_ASSIGNMENT:
-                raise Exception(
-                    "missing assignment operator after non-terminal")
+                raise BNFSyntaxError(
+                    "expect assignment operator after non-terminal", lexemes[1].pos)
 
             # extract a production rule
             i = 2
@@ -102,7 +100,8 @@ class BNFParser:
             sub = lexemes[2: i]
             lexemes = lexemes[i:]
             if len(sub) == 0:
-                raise Exception("subsitution part is empty for rule")
+                raise BNFSyntaxError(
+                    "rule for this non-terminal has no subsitution part", nt.pos)
 
             # evaluate/expand the subsitution part
             nt_idx = self._alloc_nt(nt.value)
@@ -110,28 +109,32 @@ class BNFParser:
 
             for tk in sub:
                 if tk.name == PRECENDENCE_OVERRIDE_BEGIN:
-                    self.opstack.append(PRECENDENCE_OVERRIDE_BEGIN)
+                    self.opstack.append(tk)
                     is_last_tk_v = False
                 elif tk.name == PRECENDENCE_OVERRIDE_END:
-                    last_op = self.opstack.pop()
-                    while last_op != PRECENDENCE_OVERRIDE_BEGIN:
-                        self._eval(last_op)
+                    last_op = Token(-1, "", i)
+                    while self.opstack:
                         last_op = self.opstack.pop()
+                        if last_op.name == PRECENDENCE_OVERRIDE_BEGIN:
+                            break
+                        self._eval(last_op)
+                    if last_op.name != PRECENDENCE_OVERRIDE_BEGIN:
+                        raise BNFSyntaxError("missing )", tk.pos)
                 elif tk.name == OPERATOR_RE_ZERO_OR_MORE:
-                    self.opstack.append(tk.name)
+                    self.opstack.append(tk)
                 elif tk.name == OPERATOR_RE_ONE_OR_MORE:
-                    self.opstack.append(tk.name)
+                    self.opstack.append(tk)
                 elif tk.name == OPERATOR_RE_ZERO_OR_ONE:
-                    self.opstack.append(tk.name)
+                    self.opstack.append(tk)
                 elif tk.name == OPERATOR_RE_ALTERNATION:
                     while self.opstack:
                         top = self.opstack[-1]
-                        if top in (OPERATOR_RE_ZERO_OR_MORE, OPERATOR_RE_ONE_OR_MORE, OPERATOR_RE_ZERO_OR_ONE, OPERATOR_RE_CONCATENATION):
+                        if top.name in (OPERATOR_RE_ZERO_OR_MORE, OPERATOR_RE_ONE_OR_MORE, OPERATOR_RE_ZERO_OR_ONE, OPERATOR_RE_CONCATENATION):
                             self._eval(top)
                             self.opstack.pop()
                         else:
                             break
-                    self.opstack.append(tk.name)
+                    self.opstack.append(tk)
                     is_last_tk_v = False
                 elif tk.name == NON_TERMINAL or tk.name == TERMINAL:
                     v = tk.value
@@ -140,18 +143,23 @@ class BNFParser:
                     if is_last_tk_v:
                         while self.opstack:
                             top = self.opstack[-1]
-                            if top in (OPERATOR_RE_ZERO_OR_MORE, OPERATOR_RE_ONE_OR_MORE, OPERATOR_RE_ZERO_OR_ONE):
+                            if top.name in (OPERATOR_RE_ZERO_OR_MORE, OPERATOR_RE_ONE_OR_MORE, OPERATOR_RE_ZERO_OR_ONE):
                                 self._eval(top)
                                 self.opstack.pop()
                             else:
                                 break
-                        self.opstack.append(OPERATOR_RE_CONCATENATION)
+                        self.opstack.append(
+                            Token(OPERATOR_RE_CONCATENATION, '', tk.pos))
                     self.vstack.append([v])
                     is_last_tk_v = True
                 else:
-                    raise Exception(f"got unexpected token type {tk.name}")
+                    raise Exception(
+                        f"parser error: got unexpected token type {tk.name}")
             while self.opstack:
-                self._eval(self.opstack.pop())
+                op = self.opstack.pop()
+                if op.name == PRECENDENCE_OVERRIDE_BEGIN:
+                    raise BNFSyntaxError("missing )", op.pos)
+                self._eval(op)
 
             self.rules.append((nt_idx, self.vstack.pop()))
 
@@ -163,3 +171,25 @@ class BNFParser:
         Get the index-to-name mapping for non-terminals.
         """
         return {v: k for k, v in self.nt_map.items()}
+
+    def check_warnings(self):
+        """
+        Check for warnings.
+        """
+
+        warning_msg = []
+
+        # unproducible non-terminals
+        nt_map = self.get_nt_map()
+        all_nt = set()
+        producible_nt = set()
+        for nt, sub in self.rules:
+            producible_nt.add(nt)
+            for a in sub:
+                if type(a) is int:
+                    all_nt.add(a)
+        for nt in all_nt - producible_nt:
+            warning_msg.append(
+                f"warning: no production rule for <{nt_map[nt]}> ({nt})")
+
+        return warning_msg

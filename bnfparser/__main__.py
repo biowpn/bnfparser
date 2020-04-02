@@ -1,6 +1,5 @@
 
 import argparse
-import json
 import sys
 
 from . import lexer
@@ -31,10 +30,12 @@ def main():
                     help="preserve long terminals")
     ap.add_argument("-t", "--translate", action="store_true",
                     help="translate non-terminals to their origin names")
-    ap.add_argument("-f", "--format", choices=["raw", "bnf", "json", "ssi"], default="raw",
+    ap.add_argument("-f", "--format", choices=["raw", "bnf", "ssi"], default="raw",
                     help="output format")
     ap.add_argument("-o", "--out", type=argparse.FileType('w'), default=sys.stdout,
                     help="output file")
+    ap.add_argument('-W', "--warning", action="store_true",
+                    help="issue warnings")
     args = ap.parse_args()
 
     bp = parser.BNFParser()
@@ -44,8 +45,8 @@ def main():
     try:
         lexemes = lexer.lex(buf, args.long)
         rules = bp.parse(lexemes)
-    except parser.ParsingException as e:
-        print(f"syntax error: {e}")
+    except parser.BNFSyntaxError as e:
+        print(e.format(buf))
         return
 
     if args.translate:
@@ -57,8 +58,6 @@ def main():
     elif args.format == "bnf":
         for nt, sub in rules:
             print(nt, "::=", *sub, file=args.out)
-    elif args.format == "json":
-        json.dump(rules, args.out, indent=4)
     elif args.format == "ssi":
         for nt, sub in rules:
             ints = []
@@ -70,6 +69,9 @@ def main():
                 else:
                     ints.append(ord(a))
             print(nt, *ints, file=args.out)
+
+    if args.warning:
+        print(*bp.check_warnings(), sep='\n')
 
 
 if __name__ == "__main__":

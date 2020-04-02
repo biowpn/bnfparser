@@ -12,14 +12,14 @@ def lex(_input, long: False):
     sl_char = ''
     word = ""
 
-    for _, c in enumerate(_input):
+    for i, c in enumerate(_input):
         if sl_char == r'"' or sl_char == r"'":
             if c == sl_char:
                 if word == "" or long:
-                    lexemes.append(Token(TERMINAL, word))
+                    lexemes.append(Token(TERMINAL, word, i - 1))
                 else:
                     for a in word:
-                        lexemes.append(Token(TERMINAL, a))
+                        lexemes.append(Token(TERMINAL, a, i - 1))
                 word = ""
                 sl_char = ''
             else:
@@ -29,12 +29,16 @@ def lex(_input, long: False):
         elif sl_char == r'<':
             if c == '>':
                 if word == "":
-                    raise Exception(f"non-terminal identifier is empty")
-                lexemes.append(Token(NON_TERMINAL, word))
+                    raise BNFSyntaxError(
+                        f"missing non-terminal identifier", i)
+                lexemes.append(Token(NON_TERMINAL, word, i - 1))
                 word = ""
                 sl_char = ''
-            else:
+            elif c in string.ascii_letters or c in string.digits or c == '-' or c == '_' or c == ' ':
                 word += c
+            else:
+                raise BNFSyntaxError(
+                    f"invalid character for non-terminal identifier", i)
             continue
 
         elif sl_char == '%':
@@ -42,7 +46,8 @@ def lex(_input, long: False):
                 word += c
                 continue
             if len(word) == 0:
-                raise Exception(f"no numeric expression after {sl_char}")
+                raise BNFSyntaxError(
+                    f"no numeric expression after {sl_char}", i)
             if word[0] == 'x':
                 base = 16
                 word = word[1:]
@@ -55,9 +60,14 @@ def lex(_input, long: False):
             elif word[0] in string.digits:
                 base = 10
             else:
-                raise Exception(
-                    f"unknown base specifier for numeric expression: {word[0]}")
-            lexemes.append(Token(TERMINAL, chr(int(word, base))))
+                raise BNFSyntaxError(
+                    f"unknown base specifier for numeric expression", i - len(word))
+            try:
+                a = chr(int(word, base))
+            except ValueError as e:
+                raise BNFSyntaxError(
+                    f"invalid numeric expression: {e}", i - len(word))
+            lexemes.append(Token(TERMINAL, a, i - 1))
             sl_char = ''
             word = ""
 
@@ -78,34 +88,34 @@ def lex(_input, long: False):
         elif c == ':':
             word += c
         elif c == '=':
-            lexemes.append(Token(OPREATOR_ASSIGNMENT, word + '='))
+            lexemes.append(Token(OPREATOR_ASSIGNMENT, word + '=', i))
             word = ""
 
         elif c == '|':
-            lexemes.append(Token(OPERATOR_RE_ALTERNATION, c))
+            lexemes.append(Token(OPERATOR_RE_ALTERNATION, c, i))
         elif c == '*':
-            lexemes.append(Token(OPERATOR_RE_ZERO_OR_MORE, c))
+            lexemes.append(Token(OPERATOR_RE_ZERO_OR_MORE, c, i))
         elif c == '+':
-            lexemes.append(Token(OPERATOR_RE_ONE_OR_MORE, c))
+            lexemes.append(Token(OPERATOR_RE_ONE_OR_MORE, c, i))
         elif c == '?':
-            lexemes.append(Token(OPERATOR_RE_ZERO_OR_ONE, c))
+            lexemes.append(Token(OPERATOR_RE_ZERO_OR_ONE, c, i))
 
         elif c == '[':
-            lexemes.append(Token(PRECENDENCE_OVERRIDE_BEGIN, c))
+            lexemes.append(Token(PRECENDENCE_OVERRIDE_BEGIN, c, i))
         elif c == ']':
-            lexemes.append(Token(PRECENDENCE_OVERRIDE_END, c))
-            lexemes.append(Token(OPERATOR_RE_ZERO_OR_ONE, c))
+            lexemes.append(Token(PRECENDENCE_OVERRIDE_END, c, i))
+            lexemes.append(Token(OPERATOR_RE_ZERO_OR_ONE, c, i))
 
         elif c == '(':
-            lexemes.append(Token(PRECENDENCE_OVERRIDE_BEGIN, c))
+            lexemes.append(Token(PRECENDENCE_OVERRIDE_BEGIN, c, i))
         elif c == ')':
-            lexemes.append(Token(PRECENDENCE_OVERRIDE_END, c))
+            lexemes.append(Token(PRECENDENCE_OVERRIDE_END, c, i))
 
         elif c in string.whitespace:
             pass
 
         else:
-            raise Exception(f"unexpected char '{c}''")
+            raise BNFSyntaxError(f"unexpected character '{c}'", i)
 
     return lexemes
 
